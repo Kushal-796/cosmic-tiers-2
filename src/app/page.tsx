@@ -55,15 +55,9 @@ export default function Home() {
             title="Basic"
             price={`₹59`}
             description="Get a quick, simple AI-generated report for one scenario."
-            features={[
-              { text: "Simple AI Report", included: true },
-              { text: "1 Scenario Analysis", included: true },
-              { text: "No HR/Burnout/Runway", included: false },
-              { text: "No Compliance Check", included: false },
-              { text: "No Mentoring", included: false },
-            ]}
-            cta="Sign up"
-            onClick={() => router.push("/signup")}
+            features={[{ text: "Simple AI Report", included: true },{ text: "1 Scenario Analysis", included: true },{ text: "No HR/Burnout/Runway", included: false },{ text: "No Compliance Check", included: false },{ text: "No Mentoring", included: false }]}
+            cta="Login"
+            onClick={() => router.push("/login")}
             outline="silver"
             buttonHalo="blue"
             titleAccent="purple"
@@ -73,17 +67,11 @@ export default function Home() {
             title="Standard"
             price={`₹299`}
             description="Detailed analysis including HR, burnout, and runway for up to 3 scenarios."
-            features={[
-              { text: "Detailed AI Report", included: true },
-              { text: "HR + Burnout/Runway Analysis", included: true },
-              { text: "Up to 3 Scenarios", included: true },
-              { text: "No Compliance Check", included: false },
-              { text: "No Mentoring", included: false },
-            ]}
-            cta="Sign up"
+            features={[{ text: "Detailed AI Report", included: true },{ text: "HR + Burnout/Runway Analysis", included: true },{ text: "Up to 3 Scenarios", included: true },{ text: "No Compliance Check", included: false },{ text: "No Mentoring", included: false }]}
+            cta="Login"
             highlight
             badge="Best Deal"
-            onClick={() => router.push("/signup")}
+            onClick={() => router.push("/login")}
             outline="silver"
             buttonHalo="blue"
             titleAccent="blue"
@@ -94,14 +82,9 @@ export default function Home() {
             title="Premium"
             price={`₹599`}
             description="Full report, compliance check, unlimited scenarios, and priority mentoring."
-            features={[
-              { text: "Full AI Report", included: true },
-              { text: "Compliance Check", included: true },
-              { text: "Unlimited Scenarios", included: true },
-              { text: "Priority Mentoring", included: true },
-            ]}
-            cta="Sign up"
-            onClick={() => router.push("/signup")}
+            features={[{ text: "Full AI Report", included: true },{ text: "Compliance Check", included: true },{ text: "Unlimited Scenarios", included: true },{ text: "Priority Mentoring", included: true }]}
+            cta="Login"
+            onClick={() => router.push("/login")}
             outline="gold"
             buttonHalo="yellow"
             titleAccent="gold"

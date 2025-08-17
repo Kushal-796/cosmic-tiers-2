@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence, useMotionValue, useMotionTemplate, useTransform, useReducedMotion } from "framer-motion";
 import Navbar from "@/components/Navbar";
 import Button from "@/components/Button";
@@ -54,6 +55,7 @@ type FormData = {
     audience: string; // dropdown
     businessModel: string; // dropdown
   };
+  plan: string;
 };
 
 const initial: FormData = {
@@ -61,16 +63,28 @@ const initial: FormData = {
   startup: { startupName: "", logo: undefined, tagline: "", website: "", foundingYear: "", hqCountry: "India", hqState: "", hqCity: "", hqZip: "" },
   company: { startupType: "", industries: [], stage: "", foundersCount: "", employeesRange: "", fundingStatus: "", investors: "", revenueRange: "", registrationNumber: "" },
   description: { mission: "", vision: "", detailsHtml: "", products: [], audience: "", businessModel: "" },
+  plan: "free",
 };
 
 export default function SignupPage() {
   const [step, setStep] = useState(0);
+  const router = useRouter();
   const [data, setData] = useState<FormData>(initial);
   const [direction, setDirection] = useState<1 | -1>(1);
   const prefersReduced = useReducedMotion();
   const [showSuccess, setShowSuccess] = useState(false);
   const [burstKey, setBurstKey] = useState(0);
   const touchStartX = useRef<number | null>(null);
+
+  // Get plan info from query string
+  const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const plan = params.get("plan");
+      setSelectedPlan(plan);
+    }
+  }, []);
 
   // Validation gate for step 1 (Account)
   const canNext = useMemo(() => {
@@ -157,6 +171,72 @@ export default function SignupPage() {
     return () => window.removeEventListener("keydown", onKey);
   }, [step, canNext]);
 
+  const [submitLoading, setSubmitLoading] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  function validateRequiredFields(data: FormData) {
+    // Account
+    if (!data.account.name.trim()) return "Full name is required.";
+    if (!data.account.email.trim()) return "Email is required.";
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.account.email)) return "Email format is invalid.";
+    if (!data.account.password || data.account.password.length < 8) return "Password is required (min 8 chars).";
+    if (data.account.password !== data.account.confirmPassword) return "Passwords do not match.";
+    if (!data.account.phoneCountry.trim()) return "Phone country is required.";
+    if (!data.account.phone.trim()) return "Phone number is required.";
+    if (data.account.phone.replace(/\D/g, "").length < 7) return "Phone number is invalid.";
+
+    // Startup
+    if (!data.startup.startupName.trim()) return "Startup name is required.";
+    if (!data.startup.tagline.trim()) return "Tagline is required.";
+    if (!data.startup.foundingYear.trim()) return "Founding year is required.";
+    if (!data.startup.hqCountry.trim()) return "HQ country is required.";
+    if (!data.startup.hqState.trim()) return "HQ state is required.";
+    if (!data.startup.hqCity.trim()) return "HQ city is required.";
+    if (!data.startup.hqZip.trim()) return "HQ ZIP is required.";
+
+    // Company
+    if (!data.company.startupType.trim()) return "Startup type is required.";
+    if (!data.company.industries.length) return "At least one industry is required.";
+    if (!data.company.stage.trim()) return "Company stage is required.";
+    if (!data.company.foundersCount.trim()) return "Founders count is required.";
+    if (!data.company.employeesRange.trim()) return "Employees range is required.";
+    if (!data.company.fundingStatus.trim()) return "Funding status is required.";
+
+    // Description
+    if (!data.description.mission.trim()) return "Mission is required.";
+    if (!data.description.vision.trim()) return "Vision is required.";
+    if (!data.description.detailsHtml.trim()) return "Detailed description is required.";
+    if (!data.description.products.length) return "At least one product/service is required.";
+    if (!data.description.audience.trim()) return "Audience is required.";
+    if (!data.description.businessModel.trim()) return "Business model is required.";
+
+    return null;
+  }
+
+  async function handleSubmit() {
+    const validationError = validateRequiredFields(data);
+    if (validationError) {
+      setSubmitError(validationError);
+      return;
+    }
+    setSubmitLoading(true);
+    setSubmitError(null);
+    try {
+      const res = await fetch("/api/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...data, plan: selectedPlan }),
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || "Unknown error");
+      setShowSuccess(true);
+    } catch (err: any) {
+      setSubmitError(err.message);
+    } finally {
+      setSubmitLoading(false);
+    }
+  }
+
   return (
     <div className="min-h-screen relative overflow-hidden">
   <Navbar hideLinks />
@@ -235,9 +315,12 @@ export default function SignupPage() {
                         {step < steps.length - 1 ? (
                           <Button onClick={next} disabled={!canNext} magnetic>Next</Button>
                         ) : (
-                          <Button onClick={() => setShowSuccess(true)} magnetic>Finish</Button>
+                          <Button onClick={() => router.push('/login')} magnetic>
+                            Login
+                          </Button>
                         )}
                       </div>
+                      {submitError && <div className="text-red-500 mt-2">{submitError}</div>}
                     </ModalShell>
                     <StepBurst key={burstKey} />
                   </motion.div>
@@ -569,7 +652,6 @@ function TiltItem({ children, className, intensity = 12, active = false }: { chi
     ly.set(py * r.height);
   }
   function onLeave() { rx.set(0); ry.set(0); }
-
   return (
     <motion.div
       ref={ref}
@@ -714,7 +796,10 @@ function MultiSelect({ label, values, options, onChange }: { label: string; valu
   useEffect(() => {
     function onDoc(e: MouseEvent) {
       const t = e.target as Node;
+      // Only close if click is outside both button and dropdown
       if (btnRef.current && (btnRef.current === t || btnRef.current.contains(t))) return;
+      const dropdown = document.getElementById("multi-select-dropdown");
+      if (dropdown && dropdown.contains(t)) return;
       setOpen(false);
     }
     if (open) document.addEventListener("mousedown", onDoc);
@@ -722,8 +807,11 @@ function MultiSelect({ label, values, options, onChange }: { label: string; valu
   }, [open]);
 
   function toggle(opt: string) {
-    if (values.includes(opt)) onChange(values.filter((v) => v !== opt));
-    else onChange([...values, opt]);
+    let newVals;
+    if (values.includes(opt)) newVals = values.filter((v) => v !== opt);
+    else newVals = [...values, opt];
+    console.log('[MultiSelect] toggle', opt, newVals);
+    onChange(newVals);
   }
 
   return (
@@ -739,7 +827,7 @@ function MultiSelect({ label, values, options, onChange }: { label: string; valu
         </button>
       </TiltItem>
       {open && pos && createPortal(
-        <div style={{ position: "fixed", top: pos.top, left: pos.left, width: Math.max(260, pos.width), zIndex: 50 }} className="card p-2">
+        <div id="multi-select-dropdown" style={{ position: "fixed", top: pos.top, left: pos.left, width: Math.max(260, pos.width), zIndex: 50 }} className="card p-2">
           <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search" className="w-full mb-2 rounded-lg bg-white/10 text-white placeholder-white/40 border border-white/15 px-3 py-2 outline-none focus:ring-2 focus:ring-white/30" />
           <div className="max-h-56 overflow-y-auto">
             {filtered.map((o) => (
@@ -1026,29 +1114,34 @@ function CompanyForm({ value, onChange }: { value: Company; onChange: (v: Compan
   const industryOptions = ["Fintech", "Health", "SaaS", "EdTech", "AI/ML", "eCommerce", "HealthTech", "GovTech", "Climate", "Gaming"];
   const revenueRanges = ["< $50k", "$50k–$200k", "$200k–$1M", "$1M–$5M", ">$5M"];
 
+  function debugOnChange(v: Company) {
+    console.log('[CompanyForm] industries:', v.industries);
+    onChange(v);
+  }
+
   return (
     <div>
       <div className="grid sm:grid-cols-2 gap-4">
-        <SelectField label="Startup Type" value={value.startupType} onChange={(v) => onChange({ ...value, startupType: v })} options={types} />
-        <SelectField label="Stage" value={value.stage} onChange={(v) => onChange({ ...value, stage: v })} options={stages} />
+        <SelectField label="Startup Type" value={value.startupType} onChange={(v) => debugOnChange({ ...value, startupType: v })} options={types} />
+        <SelectField label="Stage" value={value.stage} onChange={(v) => debugOnChange({ ...value, stage: v })} options={stages} />
       </div>
 
       <div className="mt-4">
-        <MultiSelect label="Industry / Sector" values={value.industries} options={industryOptions} onChange={(vals) => onChange({ ...value, industries: vals })} />
+        <MultiSelect label="Industry / Sector" values={value.industries} options={industryOptions} onChange={(vals) => debugOnChange({ ...value, industries: vals })} />
       </div>
 
       <div className="grid sm:grid-cols-3 gap-4 mt-4">
-        <Field label="Number of Founders" value={value.foundersCount} onChange={(e) => onChange({ ...value, foundersCount: e.target.value.replace(/[^\d]/g, '') })} placeholder="2" />
-        <SelectField label="Employees" value={value.employeesRange} onChange={(v) => onChange({ ...value, employeesRange: v })} options={employees} />
-        <SelectField label="Funding Status" value={value.fundingStatus} onChange={(v) => onChange({ ...value, fundingStatus: v })} options={funding} />
+        <Field label="Number of Founders" value={value.foundersCount} onChange={(e) => debugOnChange({ ...value, foundersCount: e.target.value.replace(/[^\d]/g, '') })} placeholder="2" />
+        <SelectField label="Employees" value={value.employeesRange} onChange={(v) => debugOnChange({ ...value, employeesRange: v })} options={employees} />
+        <SelectField label="Funding Status" value={value.fundingStatus} onChange={(v) => debugOnChange({ ...value, fundingStatus: v })} options={funding} />
       </div>
 
       <div className="grid sm:grid-cols-2 gap-4 mt-4">
-        <Field label="Investor Names (optional)" value={value.investors || ""} onChange={(e) => onChange({ ...value, investors: e.target.value })} placeholder="Investor A, Investor B" />
-        <SelectField label="Annual Revenue (optional)" value={value.revenueRange || ""} onChange={(v) => onChange({ ...value, revenueRange: v })} options={["", ...revenueRanges]} />
+        <Field label="Investor Names (optional)" value={value.investors || ""} onChange={(e) => debugOnChange({ ...value, investors: e.target.value })} placeholder="Investor A, Investor B" />
+        <SelectField label="Annual Revenue (optional)" value={value.revenueRange || ""} onChange={(v) => debugOnChange({ ...value, revenueRange: v })} options={["", ...revenueRanges]} />
       </div>
 
-      <Field label="Company Registration Number (optional)" value={value.registrationNumber || ""} onChange={(e) => onChange({ ...value, registrationNumber: e.target.value })} placeholder="CIN / Reg#" />
+      <Field label="Company Registration Number (optional)" value={value.registrationNumber || ""} onChange={(e) => debugOnChange({ ...value, registrationNumber: e.target.value })} placeholder="CIN / Reg#" />
     </div>
   );
 }
@@ -1076,9 +1169,10 @@ function DescriptionForm({ value, onChange }: { value: FormData["description"]; 
 // New: Interactive 3D cube preview
 function CubePreview3D({ data, step, onSelectStep }: { data: FormData; step: number; onSelectStep: (i: number) => void }) {
   const size = 260; // face size in px
-  const rx = useMotionValue(-8);
-  const ry = useMotionValue(-15);
-  const springRx = rx; // simple, responsive motion already smooth
+  // Set initial rotation so the axis is at the center of top/bottom faces
+  const rx = useMotionValue(0);
+  const ry = useMotionValue(0);
+  const springRx = rx;
   const springRy = ry;
   const containerRef = useRef<HTMLDivElement>(null);
   const draggingRef = useRef(false);
@@ -1108,15 +1202,12 @@ function CubePreview3D({ data, step, onSelectStep }: { data: FormData; step: num
       const prev = lastPos.current;
       if (!prev) return;
       const dx = e.clientX - prev.x;
-      const dy = e.clientY - prev.y;
       lastPos.current = { x: e.clientX, y: e.clientY };
       const k = 0.4;
       const newRy = ry.get() + dx * k;
-      const newRx = rx.get() - dy * k;
-      vel.current.vy = dx * k; // note: vy corresponds to yaw (ry)
-      vel.current.vx = -dy * k; // vx corresponds to pitch (rx)
+      vel.current.vy = dx * k;
       ry.set(newRy);
-      rx.set(newRx);
+      // rx stays fixed at 0
       lastMove.current = Date.now();
     }
     function onUp() {
@@ -1125,11 +1216,9 @@ function CubePreview3D({ data, step, onSelectStep }: { data: FormData; step: num
       // Inertia spin
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
       function stepInertia() {
-        const f = 0.94; // friction
-        vel.current.vx *= f;
+        const f = 0.94;
         vel.current.vy *= f;
-        if (Math.abs(vel.current.vx) < 0.01 && Math.abs(vel.current.vy) < 0.01) return;
-        rx.set(rx.get() + vel.current.vx);
+        if (Math.abs(vel.current.vy) < 0.01) return;
         ry.set(ry.get() + vel.current.vy);
         rafRef.current = requestAnimationFrame(stepInertia);
       }
@@ -1137,22 +1226,19 @@ function CubePreview3D({ data, step, onSelectStep }: { data: FormData; step: num
     }
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
-  function onTouchMove(e: TouchEvent) {
+    function onTouchMove(e: TouchEvent) {
       if (!draggingRef.current) return;
       const t = e.touches[0];
       if (!t) return;
       const prev = lastPos.current;
       if (!prev) return;
       const dx = t.clientX - prev.x;
-      const dy = t.clientY - prev.y;
       lastPos.current = { x: t.clientX, y: t.clientY };
       const k = 0.4;
       const newRy = ry.get() + dx * k;
-      const newRx = rx.get() - dy * k;
       vel.current.vy = dx * k;
-      vel.current.vx = -dy * k;
       ry.set(newRy);
-      rx.set(newRx);
+      // rx stays fixed at 0
       lastMove.current = Date.now();
     }
     function onTouchEnd() {
@@ -1161,10 +1247,8 @@ function CubePreview3D({ data, step, onSelectStep }: { data: FormData; step: num
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
       function stepInertia() {
         const f = 0.94;
-        vel.current.vx *= f;
         vel.current.vy *= f;
-        if (Math.abs(vel.current.vx) < 0.01 && Math.abs(vel.current.vy) < 0.01) return;
-        rx.set(rx.get() + vel.current.vx);
+        if (Math.abs(vel.current.vy) < 0.01) return;
         ry.set(ry.get() + vel.current.vy);
         rafRef.current = requestAnimationFrame(stepInertia);
       }
@@ -1191,25 +1275,15 @@ function CubePreview3D({ data, step, onSelectStep }: { data: FormData; step: num
     lastPos.current = { x: t.clientX, y: t.clientY };
   }
 
-  // Idle gentle auto-rotate
-  useEffect(() => {
-    let raf: number;
-    function loop() {
-      const idleMs = Date.now() - lastMove.current;
-      if (!draggingRef.current && idleMs > 2500) {
-        ry.set(ry.get() - 0.08);
-      }
-      raf = requestAnimationFrame(loop);
-    }
-    raf = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(raf);
-  }, [ry]);
 
+  // Remove idle auto-rotate (no continuous animation)
+
+  // Show only step labels, no user data
   const faces = [
-    { key: "Founder", lines: [data.account.name || "Your name", data.account.email || "email@domain"] },
-    { key: "Startup", lines: [data.startup.startupName || "Startup Name", data.startup.tagline || "Tagline"], icon: data.startup.logo },
-    { key: "Company", lines: [data.company.startupType || "Type", data.company.stage || "Stage"] },
-    { key: "About", lines: [data.description.mission || "Mission" ] },
+    { key: "Account Details", lines: [] },
+    { key: "Startup Basic Info", lines: [] },
+    { key: "Company Profile", lines: [] },
+    { key: "Detailed Description", lines: [] },
   ];
 
   function onContainerMove(e: React.MouseEvent<HTMLDivElement>) {
@@ -1236,12 +1310,12 @@ function CubePreview3D({ data, step, onSelectStep }: { data: FormData; step: num
 
           {/* Cube faces */}
           <Face label={faces[0].key} lines={faces[0].lines} size={size} style={{ transform: `translateZ(${size / 2}px)` }} highlight={step === 0} rx={rx} ry={ry} onSnap={() => { snapYaw(0); onSelectStep(0); }} />
-          <Face label={faces[1].key} lines={faces[1].lines} size={size} style={{ transform: `rotateY(90deg) translateZ(${size / 2}px)` }} image={faces[1].icon} highlight={step === 1} rx={rx} ry={ry} onSnap={() => { snapYaw(-90); onSelectStep(1); }} />
-          <Face label={faces[2].key} lines={faces[2].lines} size={size} style={{ transform: `rotateY(180deg) translateZ(${size / 2}px)` }} image={faces[2].icon} highlight={step === 2} rx={rx} ry={ry} onSnap={() => { snapYaw(-180); onSelectStep(2); }} />
+          <Face label={faces[1].key} lines={faces[1].lines} size={size} style={{ transform: `rotateY(90deg) translateZ(${size / 2}px)` }} highlight={step === 1} rx={rx} ry={ry} onSnap={() => { snapYaw(-90); onSelectStep(1); }} />
+          <Face label={faces[2].key} lines={faces[2].lines} size={size} style={{ transform: `rotateY(180deg) translateZ(${size / 2}px)` }} highlight={step === 2} rx={rx} ry={ry} onSnap={() => { snapYaw(-180); onSelectStep(2); }} />
           <Face label={faces[3].key} lines={faces[3].lines} size={size} style={{ transform: `rotateY(-90deg) translateZ(${size / 2}px)` }} highlight={step === 3} rx={rx} ry={ry} onSnap={() => { snapYaw(90); onSelectStep(3); }} />
-          {/* Top and bottom for polish */}
-          <div className="absolute" style={{ width: size, height: size, transform: `rotateX(90deg) translateZ(${size / 2}px)`, background: "linear-gradient(to bottom, rgba(255,255,255,0.06), rgba(255,255,255,0.02))", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 14, boxShadow: "0 0 40px rgba(99,102,241,0.18) inset" }} />
-          <div className="absolute" style={{ width: size, height: size, transform: `rotateX(-90deg) translateZ(${size / 2}px)`, background: "linear-gradient(to bottom, rgba(255,255,255,0.06), rgba(255,255,255,0.02))", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 14, boxShadow: "0 0 40px rgba(59,130,246,0.18) inset" }} />
+          {/* Top and bottom for polish, axis centered */}
+          <div className="absolute" style={{ width: size, height: size, transform: `rotateX(90deg) translateZ(${size / 2}px)`, transformOrigin: '50% 50%', background: "linear-gradient(to bottom, rgba(255,255,255,0.06), rgba(255,255,255,0.02))", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 14, boxShadow: "0 0 40px rgba(99,102,241,0.18) inset" }} />
+          <div className="absolute" style={{ width: size, height: size, transform: `rotateX(-90deg) translateZ(${size / 2}px)`, transformOrigin: '50% 50%', background: "linear-gradient(to bottom, rgba(255,255,255,0.06), rgba(255,255,255,0.02))", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 14, boxShadow: "0 0 40px rgba(59,130,246,0.18) inset" }} />
         </motion.div>
       </div>
     </div>
@@ -1249,21 +1323,13 @@ function CubePreview3D({ data, step, onSelectStep }: { data: FormData; step: num
 }
 
 function Face({ label, lines, size, style, image, highlight, rx, ry, onSnap }: { label: string; lines: string[]; size: number; style: React.CSSProperties; image?: string; highlight?: boolean; rx: ReturnType<typeof useMotionValue<number>>; ry: ReturnType<typeof useMotionValue<number>>; onSnap: () => void }) {
-  const x = useTransform(ry, (v) => v * -0.6);
-  const y = useTransform(rx, (v) => v * 0.6);
-  const contentTransform = useMotionTemplate`translateZ(22px) translateX(${x}px) translateY(${y}px)`;
+  // Center the text and remove any translation transforms
   return (
     <div className="absolute [backface-visibility:hidden] rounded-2xl overflow-hidden" style={{ width: size, height: size, ...style }} onClick={onSnap}>
-      <div className="w-full h-full relative card p-4 sm:p-5 border border-white/15 shadow-[0_0_24px_rgba(99,102,241,0.12),_0_0_24px_rgba(59,130,246,0.12)] [transform-style:preserve-3d]">
-        {image && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={image} alt="icon" className="absolute top-3 right-3 size-8 rounded-md border border-white/20" />
-        )}
-        <motion.div style={{ transform: contentTransform }}>
-          <div className="text-white/60 text-xs">{label}</div>
-          <div className="text-white font-semibold leading-tight mt-1 line-clamp-2 break-words">{lines[0]}</div>
-          {lines[1] && <div className="text-white/70 text-sm mt-0.5 line-clamp-1 break-words">{lines[1]}</div>}
-        </motion.div>
+      <div className="w-full h-full relative card p-4 sm:p-5 border border-white/15 shadow-[0_0_24px_rgba(99,102,241,0.12),_0_0_24px_rgba(59,130,246,0.12)] [transform-style:preserve-3d] flex flex-col justify-center items-center">
+        <div className="w-full h-full flex flex-col justify-center items-center text-center">
+          <div className="text-white font-semibold text-lg whitespace-pre-line text-center flex items-center justify-center h-full w-full">{label}</div>
+        </div>
         {/* Glow ring when highlighted */}
         {highlight && <div className="absolute inset-0 rounded-2xl ring-2 ring-sky-300/50 shadow-[0_0_60px_rgba(56,189,248,0.35)] pointer-events-none" />}
       </div>

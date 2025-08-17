@@ -32,19 +32,12 @@ export default function Navbar({ hideLinks = false }: { hideLinks?: boolean }) {
           <span className="font-semibold">S-Hatch</span>
         </Link>
 
-        {!hideLinks && (
-          <nav className="hidden md:flex items-center gap-7 text-sm text-white/80">
-            <Link href="#features" className="hover:text-white">Features</Link>
-            <Link href="#download" className="hover:text-white">Download</Link>
-            <Link href="#resources" className="hover:text-white">Resources</Link>
-            <Link href="#pricing" className="hover:text-white">Pricing</Link>
-            <Link href="#business" className="hover:text-white">Business VPN</Link>
-          </nav>
-        )}
-
         <div className="hidden md:flex items-center gap-3">
-          <a href="#login" className="btn-pill border border-transparent text-white/80 hover:text-white hover:bg-white/10">Login</a>
-          <Link href="/signup" className="btn-gradient btn-pill">Sign up</Link>
+          {hideLinks ? (
+            <Link href="/login" className="btn-gradient btn-pill">Login</Link>
+          ) : (
+            <Link href="/signup" className="btn-gradient btn-pill">Sign up</Link>
+          )}
         </div>
 
         <button
@@ -86,8 +79,11 @@ export default function Navbar({ hideLinks = false }: { hideLinks?: boolean }) {
             </>
           )}
           <div className="pt-2 grid grid-cols-2 gap-3">
-            <a href="#login" onClick={() => setOpen(false)} className="btn-pill border border-transparent text-white/80 hover:text-white hover:bg-white/10 text-center">Login</a>
-            <Link href="/signup" onClick={() => setOpen(false)} className="btn-gradient btn-pill text-center">Sign up</Link>
+            {hideLinks ? (
+              <Link href="/login" onClick={() => setOpen(false)} className="btn-gradient btn-pill text-center">Login</Link>
+            ) : (
+              <Link href="/signup" onClick={() => setOpen(false)} className="btn-gradient btn-pill text-center">Sign up</Link>
+            )}
           </div>
         </div>
       </motion.div>
