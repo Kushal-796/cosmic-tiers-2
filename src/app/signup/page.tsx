@@ -213,29 +213,54 @@ export default function SignupPage() {
     return null;
   }
 
+  // async function handleSubmit() {
+  //   const validationError = validateRequiredFields(data);
+  //   if (validationError) {
+  //     setSubmitError(validationError);
+  //     return;
+  //   }
+  //   setSubmitLoading(true);
+  //   setSubmitError(null);
+  //   try {
+  //     const res = await fetch("/api/signup", {
+  //       method: "POST",
+  //       headers: { "Content-Type": "application/json" },
+  //       body: JSON.stringify({ ...data, plan: selectedPlan }),
+  //     });
+  //     const result = await res.json();
+  //     if (!res.ok) throw new Error(result.error || "Unknown error");
+  //     setShowSuccess(true);
+  //   } catch (err: any) {
+  //     setSubmitError(err.message);
+  //   } finally {
+  //     setSubmitLoading(false);
+  //   }
+  // }
   async function handleSubmit() {
-    const validationError = validateRequiredFields(data);
-    if (validationError) {
-      setSubmitError(validationError);
-      return;
-    }
-    setSubmitLoading(true);
-    setSubmitError(null);
-    try {
-      const res = await fetch("/api/signup", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...data, plan: selectedPlan }),
-      });
-      const result = await res.json();
-      if (!res.ok) throw new Error(result.error || "Unknown error");
-      setShowSuccess(true);
-    } catch (err: any) {
-      setSubmitError(err.message);
-    } finally {
-      setSubmitLoading(false);
-    }
+  const validationError = validateRequiredFields(data);
+  if (validationError) {
+    setSubmitError(validationError);
+    return;
   }
+  setSubmitLoading(true);
+  setSubmitError(null);
+  try {
+    const res = await fetch("/api/signup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...data, plan: selectedPlan }),
+    });
+    const result = await res.json();
+    if (!res.ok) throw new Error(result.error || "Unknown error");
+    setShowSuccess(true);
+  } catch (err) { // Change is here: removed ': any'
+    // TypeScript now correctly infers 'err' as 'unknown' or 'any' from the catch block.
+    // To be safer, you can check its type before using.
+    setSubmitError(err instanceof Error ? err.message : "An unknown error occurred.");
+  } finally {
+    setSubmitLoading(false);
+  }
+}
 
   return (
     <div className="min-h-screen relative overflow-hidden">
